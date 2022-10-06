@@ -10,10 +10,13 @@ import numpy as np
 import itertools
 import gc  # garbage collection
 from lightgbm import LGBMClassifier
+from scipy.stats import loguniform
+from sklearn.model_selection import RandomizedSearchCV
+
 
 # data loading
 DEBUG = False
-SAMPLE = 0.5
+SAMPLE = 0.001
 SEED = 42
 
 col_dtypes = {
@@ -55,6 +58,7 @@ for i in range(10):
         break
     
 
+### Feature Engineer ###
 def euclidian_norm(x):
     return np.linalg.norm(x, axis=1)
 
@@ -68,111 +72,117 @@ pos_groups = {
 for col, vec in pos_groups.items():
     df[col + "_ball_dist"] = euclidian_norm(df[vec].values - df[pos_groups["ball_pos"]].values)
 
-import math
-def calculate_distance_1(x1,y1,z1,x2,y2,z2):
-    d = 0.0
-    d+= (x1-x2)**2
-    d+= (y1-y2)**2
-    d+= (z1-z2)**2
-    return math.sqrt(d)
+
+# import math
+# def calculate_distance_1(x1,y1,z1,x2,y2,z2):
+#     d = 0.0
+#     d+= (x1-x2)**2
+#     d+= (y1-y2)**2
+#     d+= (z1-z2)**2
+#     return math.sqrt(d)
 
     
-for p in ['p0','p1','p2','p3','p4','p5']:
-    col1 = p+'_dist_B_goal'
-    col2 = p+'_dist_A_goal'
-    p_x = p+'_pos_x'
-    p_y = p+'_pos_y'
-    p_z = p+'_pos_z'
-    df[col1] = df.apply(lambda x: calculate_distance_1(x[p_x], x[p_y], x[p_z], 0, -100, 6.8), axis=1)
-    df[col2] = df.apply(lambda x: calculate_distance_1(x[p_x], x[p_y], x[p_z], 0, 100, 6.8), axis=1)
+# for p in ['p0','p1','p2','p3','p4','p5']:
+#     col1 = p+'_dist_B_goal'
+#     col2 = p+'_dist_A_goal'
+#     p_x = p+'_pos_x'
+#     p_y = p+'_pos_y'
+#     p_z = p+'_pos_z'
+#     df[col1] = df.apply(lambda x: calculate_distance_1(x[p_x], x[p_y], x[p_z], 0, -100, 6.8), axis=1)
+#     df[col2] = df.apply(lambda x: calculate_distance_1(x[p_x], x[p_y], x[p_z], 0, 100, 6.8), axis=1)
     
     
 cols_to_drop = [
     'game_num', 'event_id', 'event_time', 'player_scoring_next', 'team_scoring_next'
 ]
 
+### Hypertune ###
 
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import cross_validate
 
 df = df.drop(columns=cols_to_drop)
 df = df.dropna(axis=0)
 gc.collect()
 
-model_a = LGBMClassifier(n_jobs=-1)
 
-cv_a = cross_validate(
-    model_a, 
-    X=df.drop(columns=['team_A_scoring_within_10sec', 'team_B_scoring_within_10sec']).values,
-    y=df['team_A_scoring_within_10sec'].values,
-    scoring="neg_log_loss",
+param_distribs = {
+    "objective": ["binary"],
+    "num_leaves": range(20, 3000, 10),
+    "n_estimators": range(100, 1000, 10),
+    "learning_rate": loguniform(0.01, 0.3),
+    "max_depth": range(3, 12),
+    "feature_fraction": loguniform(0.2, 0.9),
+    "subsample": [0.7],
+    "subsample_freq": [8],
+    "n_jobs": [-1],
+    "reg_alpha": [1],
+    "reg_lambda": [2],
+    "min_child_samples": [90]    
+    
+    
+}
+
+lgbm = LGBMClassifier()
+rnd_search = RandomizedSearchCV(
+    lgbm,
+    param_distributions=param_distribs,
+    n_iter=30,
     cv=5,
+    scoring="roc_auc",
     verbose=2,
-    return_estimator=True,
-    n_jobs=-1
+    random_state=42,
+    n_jobs=-1,
 )
+rnd_search.fit(df.drop(columns=['team_A_scoring_within_10sec', 'team_B_scoring_within_10sec']).values, 
+               df['team_A_scoring_within_10sec'].values)
 
-df_cv_a = pd.DataFrame(
-    {
-        "model": "Model A",
-        "fold": list(range(5)),
-        "test_log_loss": - cv_a["test_score"]
-    }
-)
+# Train
+params = {
+    'objective': 'binary',
+    'num_leaves': 128,
+    'n_estimators': 100,
+    'max_depth': 10, # was 10
+    'learning_rate': 0.1,
+    'feature_fraction': 0.75, # was 0.75
+    'subsample': 0.7,
+    'subsample_freq': 8,
+    'n_jobs': -1,
+    'reg_alpha': 1,
+    'reg_lambda': 2,
+    'min_child_samples': 90,
+}
 
-model_b = RandomForestClassifier(n_jobs=-1)
-
-cv_b = cross_validate(
-    model_b, 
+model_a = LGBMClassifier(**params)
+model_a.fit(
     X=df.drop(columns=['team_A_scoring_within_10sec', 'team_B_scoring_within_10sec']).values,
-    y=df['team_B_scoring_within_10sec'].values,
-    scoring="neg_log_loss",
-    cv=5,
-    verbose=2,
-    return_estimator=True,
-    n_jobs=-1
-)
+    y=df['team_A_scoring_within_10sec'].values
+    )
 
-df_cv_b = pd.DataFrame(
-    {
-        "model": "Model B",
-        "fold": list(range(5)),
-        "test_log_loss": - cv_b["test_score"]
-    }
-)
+
+
+model_b = LGBMClassifier(**params)
+model_b.fit(
+    X=df.drop(columns=['team_A_scoring_within_10sec', 'team_B_scoring_within_10sec']).values,
+    y=df['team_B_scoring_within_10sec'].values
+    )
 
 
 df_test = pd.read_csv('data/test.csv')
 for col, vec in pos_groups.items():
     df_test[col + "_ball_dist"] = euclidian_norm(df_test[vec].values - df_test[pos_groups["ball_pos"]].values)
 
-for p in ['p0','p1','p2','p3','p4','p5']:
-    col1 = p+'_dist_B_goal'
-    col2 = p+'_dist_A_goal'
-    p_x = p+'_pos_x'
-    p_y = p+'_pos_y'
-    p_z = p+'_pos_z'
-    df_test[col1] = df_test.apply(lambda x: calculate_distance_1(x[p_x], x[p_y], x[p_z], 0, -100, 6.8), axis=1)
-    df_test[col2] = df_test.apply(lambda x: calculate_distance_1(x[p_x], x[p_y], x[p_z], 0, 100, 6.8), axis=1)
-    
 
 from sklearn.impute import SimpleImputer
 imp = SimpleImputer(missing_values=np.nan, strategy='mean')
 
 pred_a = np.zeros(df_test.shape[0])
-for estimator in cv_a['estimator']:
-    pred_a_X = imp.fit_transform(df_test.drop(columns=['id']))
-    pred_a += estimator.predict_proba(pred_a_X)[:, 1]
-
-pred_a /= 5
+pred_a_X = imp.fit_transform(df_test.drop(columns=['id']))
+pred_a += model_a.predict_proba(pred_a_X)[:, 1]
 
 
 pred_b = np.zeros(df_test.shape[0])
-for estimator in cv_b['estimator']:
-    pred_b_X = imp.fit_transform(df_test.drop(columns=['id']))
-    pred_b += estimator.predict_proba(pred_b_X)[:, 1]
+pred_b_X = imp.fit_transform(df_test.drop(columns=['id']))
+pred_b += model_b.predict_proba(pred_b_X)[:, 1]
 
-pred_b /= 5
 
 
 df_submission = pd.DataFrame(
