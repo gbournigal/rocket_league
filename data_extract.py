@@ -10,13 +10,13 @@ import numpy as np
 import itertools
 import gc  # garbage collection
 from lightgbm import LGBMClassifier
-from scipy.stats import loguniform
+from scipy.stats import uniform
 from sklearn.model_selection import RandomizedSearchCV
 
 
 # data loading
 DEBUG = False
-SAMPLE = 0.001
+SAMPLE = 1
 SEED = 42
 
 col_dtypes = {
@@ -106,31 +106,30 @@ gc.collect()
 
 param_distribs = {
     "objective": ["binary"],
-    "num_leaves": range(20, 3000, 10),
-    "n_estimators": range(100, 1000, 10),
-    "learning_rate": loguniform(0.01, 0.3),
+    "num_leaves": range(20, 200, 20),
+    "n_estimators": range(100, 1000, 50),
+    "learning_rate": uniform(0.01, 0.29),
     "max_depth": range(3, 12),
-    "feature_fraction": loguniform(0.2, 0.9),
+    "feature_fraction": uniform(0.2, 0.75),
     "subsample": [0.7],
     "subsample_freq": [8],
     "n_jobs": [-1],
     "reg_alpha": [1],
     "reg_lambda": [2],
     "min_child_samples": [90]    
-    
-    
 }
 
 lgbm = LGBMClassifier()
 rnd_search = RandomizedSearchCV(
     lgbm,
     param_distributions=param_distribs,
-    n_iter=30,
+    n_iter=100,
     cv=5,
-    scoring="roc_auc",
+    scoring="neg_log_loss",
     verbose=2,
-    random_state=42,
+    random_state=1,
     n_jobs=-1,
+    return_train_score=True
 )
 rnd_search.fit(df.drop(columns=['team_A_scoring_within_10sec', 'team_B_scoring_within_10sec']).values, 
                df['team_A_scoring_within_10sec'].values)
@@ -138,11 +137,11 @@ rnd_search.fit(df.drop(columns=['team_A_scoring_within_10sec', 'team_B_scoring_w
 # Train
 params = {
     'objective': 'binary',
-    'num_leaves': 128,
-    'n_estimators': 100,
+    'num_leaves': 140, # was 128
+    'n_estimators': 1000,
     'max_depth': 10, # was 10
-    'learning_rate': 0.1,
-    'feature_fraction': 0.75, # was 0.75
+    'learning_rate': 0.014045956, # was 0.1
+    'feature_fraction': 0.7083506685757333, # was 0.75
     'subsample': 0.7,
     'subsample_freq': 8,
     'n_jobs': -1,
@@ -159,7 +158,19 @@ model_a.fit(
 
 
 
+
 model_b = LGBMClassifier(**params)
+# from sklearn.model_selection import cross_validate
+
+# cv_results = cross_validate(model_b, 
+#                             X=df.drop(columns=['team_A_scoring_within_10sec', 'team_B_scoring_within_10sec']).values,
+#                             y=df['team_B_scoring_within_10sec'].values, 
+#                             cv=5,
+#                             n_jobs=-1,
+#                             scoring="neg_log_loss",
+#                             return_train_score=True
+#                             )
+
 model_b.fit(
     X=df.drop(columns=['team_A_scoring_within_10sec', 'team_B_scoring_within_10sec']).values,
     y=df['team_B_scoring_within_10sec'].values
