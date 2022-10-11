@@ -65,13 +65,34 @@ def euclidian_norm(x):
 
 pos_groups = {
     f"{el}_pos": [f'{el}_pos_x', f'{el}_pos_y', f'{el}_pos_z']
-    for el in ['ball'] + [f'p{i}' for i in range(6)]
+    for el in ['ball', 'goal_A', 'goal_B'] + [f'p{i}' for i in range(6)]
 }
 
 
-for col, vec in pos_groups.items():
-    df[col + "_ball_dist"] = euclidian_norm(df[vec].values - df[pos_groups["ball_pos"]].values)
+def distances(df):
+    df['goal_A_pos_x'] = 0
+    df['goal_B_pos_x'] = 0
+    df['goal_A_pos_y'] = -102.5
+    df['goal_B_pos_y'] = 102.5
+    df['goal_A_pos_z'] = -1.2
+    df['goal_B_pos_z'] = 1.2
+    
+    for col, vec in pos_groups.items():
+        df[col + "_ball_dist"] = euclidian_norm(df[vec].values - df[pos_groups["ball_pos"]].values)
+    
+    return df
 
+
+def demolitions(df):
+    for i in range(6):
+        df[f'p{i}_demo'] = (df[f'p{i}_pos_x'].isna()).astype(int)
+    df['active_players_A'] = 3-df['p0_demo']-df['p1_demo']-df['p2_demo']
+    df['active_players_B'] = 3-df['p3_demo']-df['p4_demo']-df['p5_demo']
+    return df
+
+
+df = distances(df)
+df = demolitions(df)
 
 # import math
 # def calculate_distance_1(x1,y1,z1,x2,y2,z2):
@@ -93,7 +114,18 @@ for col, vec in pos_groups.items():
     
     
 cols_to_drop = [
-    'game_num', 'event_id', 'event_time', 'player_scoring_next', 'team_scoring_next'
+    'game_num', 
+    'event_id', 
+    'event_time', 
+    'player_scoring_next', 
+    'team_scoring_next', 
+    'ball_pos_ball_dist',
+    'goal_A_pos_x',
+    'goal_B_pos_x',
+    'goal_A_pos_y',
+    'goal_B_pos_y',
+    'goal_A_pos_z',
+    'goal_B_pos_z'
 ]
 
 ### Hypertune ###
@@ -177,9 +209,20 @@ model_b.fit(
     )
 
 
+### TEST ###
+
+
 df_test = pd.read_csv('data/test.csv')
-for col, vec in pos_groups.items():
-    df_test[col + "_ball_dist"] = euclidian_norm(df_test[vec].values - df_test[pos_groups["ball_pos"]].values)
+df_test = distances(df_test)
+df_test = demolitions(df_test)
+df_test = df_test.drop(columns=['ball_pos_ball_dist',
+                                'goal_A_pos_x',
+                                'goal_B_pos_x',
+                                'goal_A_pos_y',
+                                'goal_B_pos_y',
+                                'goal_A_pos_z',
+                                'goal_B_pos_z'])
+
 
 
 from sklearn.impute import SimpleImputer
