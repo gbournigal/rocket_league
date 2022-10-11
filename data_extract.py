@@ -88,6 +88,14 @@ def demolitions(df):
         df[f'p{i}_demo'] = (df[f'p{i}_pos_x'].isna()).astype(int)
     df['active_players_A'] = 3-df['p0_demo']-df['p1_demo']-df['p2_demo']
     df['active_players_B'] = 3-df['p3_demo']-df['p4_demo']-df['p5_demo']
+    df.drop(columns=['p0_demo',
+                     'p1_demo',
+                     'p2_demo',
+                     'p3_demo',
+                     'p4_demo',
+                     'p5_demo',
+                     ],
+            inplace=True)
     return df
 
 
@@ -132,7 +140,6 @@ cols_to_drop = [
 
 
 df = df.drop(columns=cols_to_drop)
-df = df.dropna(axis=0)
 gc.collect()
 
 
