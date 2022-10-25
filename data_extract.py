@@ -11,7 +11,19 @@ import gc  # garbage collection
 
 # data loading
 
-def data_load(SAMPLE=1, SEED=42):   
+def data_load(SAMPLE=1, SEED=42, df_size='full'):
+    if df_size == 'full':
+        rng_val = 10
+    elif df_size == 'experimentation':
+        rng_val = 9
+    elif df_size == 'validation':
+        rng_val_inf = 9
+        rng_val_sup = 10
+    else:
+        raise Exception('Wrong parameter for df')
+        
+        
+    
     col_dtypes = {
         'game_num': 'int8', 'event_id': 'int8', 'event_time': 'float16',
         'ball_pos_x': 'float16', 'ball_pos_y': 'float16', 'ball_pos_z': 'float16',
@@ -39,14 +51,24 @@ def data_load(SAMPLE=1, SEED=42):
     
     path_to_data = 'data'
     df = pd.DataFrame({}, columns=cols)
-    for i in range(10):
-        df_tmp = pd.read_csv(f'{path_to_data}/train_{i}.csv', dtype=col_dtypes)
-        if SAMPLE < 1:
-            df_tmp = df_tmp.sample(frac=SAMPLE, random_state=SEED)
-            
-        df = pd.concat([df, df_tmp])
-        del df_tmp
-        gc.collect()
+    if df_size in ['full', 'experimentation']:
+        for i in range(rng_val):
+            df_tmp = pd.read_csv(f'{path_to_data}/train_{i}.csv', dtype=col_dtypes)
+            if SAMPLE < 1:
+                df_tmp = df_tmp.sample(frac=SAMPLE, random_state=SEED)
+                
+            df = pd.concat([df, df_tmp])
+            del df_tmp
+            gc.collect()
+    else:
+        for i in range(rng_val_inf, rng_val_sup):
+            df_tmp = pd.read_csv(f'{path_to_data}/train_{i}.csv', dtype=col_dtypes)
+            if SAMPLE < 1:
+                df_tmp = df_tmp.sample(frac=SAMPLE, random_state=SEED)
+                
+            df = pd.concat([df, df_tmp])
+            del df_tmp
+            gc.collect()
     return df
 
 
@@ -108,10 +130,10 @@ def data_load(SAMPLE=1, SEED=42):
 
 
 # classifier = XGBClassifier(n_jobs=-1,
-#                            tree_method='gpu_hist')
+#                             tree_method='gpu_hist')
 # start = timer()
 # model = classifier.fit(df_tmp.drop(columns=['team_A_scoring_within_10sec', 'team_B_scoring_within_10sec']).values,
-#                        df_tmp['team_B_scoring_within_10sec'].astype('int').values)
+#                         df_tmp['team_B_scoring_within_10sec'].astype('int').values)
 # print("without GPU:", timer()-start) 
 
 

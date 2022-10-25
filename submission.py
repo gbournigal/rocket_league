@@ -5,15 +5,16 @@ Created on Wed Oct 19 15:18:43 2022
 @author: gbournigal
 """
 
-
+import pickle
 import pandas as pd
 import numpy as np
 from feature_engineer import distances, demolitions
 
 ### TEST ###
+models = pickle.load(open('results/final_models.pickle', 'rb'))
 
-model_a = 'PENDIENTE DEFINIRLO'
-model_b = 'PENDIENTE DEFINIRLO'
+model_a = models['model_a']
+model_b = models['model_b']
 
 df_test = pd.read_csv('data/test.csv')
 df_test = distances(df_test)
@@ -27,17 +28,18 @@ df_test = df_test.drop(columns=['ball_pos_ball_dist',
                                 'goal_B_pos_z'])
 
 
-
-from sklearn.impute import SimpleImputer
-imp = SimpleImputer(missing_values=np.nan, strategy='mean')
+# from sklearn.impute import SimpleImputer
+# imp = SimpleImputer(missing_values=np.nan, strategy='mean')
 
 pred_a = np.zeros(df_test.shape[0])
-pred_a_X = imp.fit_transform(df_test.drop(columns=['id']))
+# pred_a_X = imp.fit_transform(df_test.drop(columns=['id']))
+pred_a_X =df_test.drop(columns=['id'])
 pred_a += model_a.predict_proba(pred_a_X)[:, 1]
 
 
 pred_b = np.zeros(df_test.shape[0])
-pred_b_X = imp.fit_transform(df_test.drop(columns=['id']))
+# pred_b_X = imp.fit_transform(df_test.drop(columns=['id']))
+pred_b_X = df_test.drop(columns=['id'])
 pred_b += model_b.predict_proba(pred_b_X)[:, 1]
 
 
