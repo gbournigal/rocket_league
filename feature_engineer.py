@@ -62,3 +62,10 @@ def demolitions(df):
                      ],
             inplace=True)
     return df
+
+
+def calc_speeds(df):
+    df['ball_speed'] = np.sqrt((df['ball_vel_x']**2)+(df['ball_vel_y']**2)+(df['ball_vel_z']**2))
+    for i in range(6):
+        df[f'p{i}_speed'] = np.sqrt((df[f'p{i}_vel_x']**2)+(df[f'p{i}_vel_y']**2)+(df[f'p{i}_vel_z']**2))
+    return df

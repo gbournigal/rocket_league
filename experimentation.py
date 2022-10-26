@@ -12,7 +12,7 @@ from sklearn.model_selection import cross_validate
 from sklearn.metrics import log_loss
 from data_extract import data_load
 from data_augmentation import mirror_board
-from feature_engineer import distances, demolitions, cols_to_drop
+from feature_engineer import distances, demolitions, cols_to_drop, calc_speeds
 import gc  # garbage collection
 
 
@@ -72,28 +72,29 @@ if __name__ == '__main__':
     for i in dfs.keys():
         dfs[i] = distances(dfs[i])
         dfs[i] = demolitions(dfs[i])
+        dfs[i] = calc_speeds(dfs[i])
         dfs[i] = dfs[i].drop(columns=cols_to_drop)
     gc.collect()
     
     params = {
         'objective': 'binary',
         'num_leaves': 140, # was 128
-        'n_estimators': 1000,
-        'max_depth': 10, # was 10
-        'learning_rate': 0.014045956, # was 0.1
-        'feature_fraction': 0.7083506685757333, # was 0.75
+        'n_estimators': 1500, # was 1000
+        'max_depth': 7, # was 10
+        'learning_rate': 0.03, # was 0.1
+        'feature_fraction': 0.664079, # was 0.75
         'subsample': 0.7,
         'subsample_freq': 8,
         'n_jobs': -1,
-        'reg_alpha': 1,
-        'reg_lambda': 2,
-        'min_child_samples': 90,
+        'reg_alpha': 0, # was 1
+        'reg_lambda': 2, # was 2
+        'min_child_samples': 50,
     }
     model_b = LGBMClassifier(**params)
     evaluation_model(dfs['df'],
                      dfs['df_eval_simple'],
                      model_b,
-                     'LightGBM_hyper_50_eval',
+                     'LightGBM_hyper_50_new_train',
                      params,
                      SAMPLE,
                     )
@@ -114,7 +115,7 @@ if __name__ == '__main__':
     evaluation_model(dfs['df'],
                      dfs['df_eval_simple'],
                      model_b,
-                     'XGBC_50_hyper_3',
+                     'XGBC_50_hyper_speed',
                      params_xgb,
                      SAMPLE,
                     )
@@ -122,10 +123,11 @@ if __name__ == '__main__':
     
     
     lightgbm_result = pickle.load(open('results/model_LightGBM_hyper_50_eval_results.pickle', 'rb'))
-    xgboost_hyper_result = pickle.load(open('results/model_XGBC_50_hyper_results.pickle', 'rb'))
-    xgboost_hyper_3_result = pickle.load(open('results/model_XGBC_50_hyper_3_results.pickle', 'rb'))
+    lightgbm_hyper_result_new = pickle.load(open('results/model_LightGBM_hyper_50_new_train_results.pickle', 'rb'))
+    xgboost_hyper_3_result = pickle.load(open('results/model_XGBC_50_hyper_results.pickle', 'rb'))
+    xgboost_hyper_3_result_nf = pickle.load(open('results/model_XGBC_50_hyper_speed_results.pickle', 'rb'))
     
-    rnd_search = pickle.load(open('results/rnd_search_xgb1_results.pickle', 'rb'))
+    rnd_search = pickle.load(open('results/rnd_search_lgbm_results.pickle', 'rb'))
     
     
 

@@ -8,7 +8,7 @@ Created on Wed Oct 19 15:18:43 2022
 import pickle
 import pandas as pd
 import numpy as np
-from feature_engineer import distances, demolitions
+from feature_engineer import distances, demolitions, calc_speeds
 
 ### TEST ###
 models = pickle.load(open('results/final_models.pickle', 'rb'))
@@ -19,6 +19,7 @@ model_b = models['model_b']
 df_test = pd.read_csv('data/test.csv')
 df_test = distances(df_test)
 df_test = demolitions(df_test)
+df_test = calc_speeds(df_test)
 df_test = df_test.drop(columns=['ball_pos_ball_dist',
                                 'goal_A_pos_x',
                                 'goal_B_pos_x',

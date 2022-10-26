@@ -62,6 +62,10 @@ rnd_search = RandomizedSearchCV(
 rnd_search.fit(df.drop(columns=['team_A_scoring_within_10sec', 'team_B_scoring_within_10sec']).values, 
                df['team_A_scoring_within_10sec'].values)
 
+results_rnd = pd.DataFrame(rnd_search.cv_results_)
+pickle.dump(results_rnd, open('results/rnd_search_lgbm_results.pickle', 'wb'))
+
+
 
 param_distribs = {
     "max_depth": range(3, 11),
