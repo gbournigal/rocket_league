@@ -11,8 +11,14 @@ from xgboost import XGBClassifier
 from sklearn.model_selection import cross_validate
 from sklearn.metrics import log_loss
 from data_extract import data_load
-from data_augmentation import mirror_board
-from feature_engineer import distances, demolitions, cols_to_drop, calc_speeds
+from data_augmentation import mirror_board, mirror_x
+from feature_engineer import (distances, 
+                              demolitions,
+                              cols_to_drop,
+                              calc_speeds,
+                              min_dist_to_goal,
+                              max_dist_to_goal,
+                              mean_dist_to_goal)
 import gc  # garbage collection
 
 
@@ -58,9 +64,11 @@ def evaluation_model(df,
     
 
 if __name__ == '__main__':
-    SAMPLE=0.5
+    SAMPLE=0.01
 
     df = data_load(SAMPLE=SAMPLE, df_size='experimentation')
+    df = mirror_board(df)
+    df = mirror_x(df, percentage=0.5)
     
     df_eval = data_load(SAMPLE=1, df_size='validation')
     df_eval_simple = df_eval.copy()
@@ -68,11 +76,14 @@ if __name__ == '__main__':
     dfs = {'df': df,
            'df_eval_simple': df_eval_simple}
 
-    # df = mirror_board(df)
+
     for i in dfs.keys():
         dfs[i] = distances(dfs[i])
         dfs[i] = demolitions(dfs[i])
         dfs[i] = calc_speeds(dfs[i])
+        dfs[i] = min_dist_to_goal(dfs[i])
+        dfs[i] = max_dist_to_goal(dfs[i])
+        dfs[i] = mean_dist_to_goal(dfs[i])
         dfs[i] = dfs[i].drop(columns=cols_to_drop)
     gc.collect()
     
@@ -85,7 +96,7 @@ if __name__ == '__main__':
         'feature_fraction': 0.664079, # was 0.75
         'subsample': 0.7,
         'subsample_freq': 8,
-        'n_jobs': -1,
+        'n_jobs': -2,
         'reg_alpha': 0, # was 1
         'reg_lambda': 2, # was 2
         'min_child_samples': 50,
@@ -94,40 +105,34 @@ if __name__ == '__main__':
     evaluation_model(dfs['df'],
                      dfs['df_eval_simple'],
                      model_b,
-                     'LightGBM_hyper_50_new_train',
+                     'LightGBM_hyper_01_minmax',
                      params,
                      SAMPLE,
                     )
     
     
-    params_xgb = {
-        'objective': 'binary:logistic',
-        'tree_method': 'gpu_hist',
-        'n_estimators': 1800,
-        'colsample_bytree': 0.562821,
-        'learning_rate': 0.0130056,
-        'max_depth': 7,
-        'alpha': 1.5,
-        'lambda': 1.5,
-        'gamma': 0.2
-        }
-    model_b = XGBClassifier(**params_xgb)
-    evaluation_model(dfs['df'],
-                     dfs['df_eval_simple'],
-                     model_b,
-                     'XGBC_50_hyper_speed',
-                     params_xgb,
-                     SAMPLE,
-                    )
+    # params_xgb = {
+    #     'objective': 'binary:logistic',
+    #     'tree_method': 'gpu_hist',
+    #     'n_estimators': 1800,
+    #     'colsample_bytree': 0.562821,
+    #     'learning_rate': 0.0130056,
+    #     'max_depth': 7,
+    #     'alpha': 1.5,
+    #     'lambda': 1.5,
+    #     'gamma': 0.2
+    #     }
+    # model_b = XGBClassifier(**params_xgb)
+    # evaluation_model(dfs['df'],
+    #                  dfs['df_eval_simple'],
+    #                  model_b,
+    #                  'XGBC_50_hyper_speed',
+    #                  params_xgb,
+    #                  SAMPLE,
+    #                 )
     
     
     
-    lightgbm_result = pickle.load(open('results/model_LightGBM_hyper_50_eval_results.pickle', 'rb'))
-    lightgbm_hyper_result_new = pickle.load(open('results/model_LightGBM_hyper_50_new_train_results.pickle', 'rb'))
-    xgboost_hyper_3_result = pickle.load(open('results/model_XGBC_50_hyper_results.pickle', 'rb'))
-    xgboost_hyper_3_result_nf = pickle.load(open('results/model_XGBC_50_hyper_speed_results.pickle', 'rb'))
-    
-    rnd_search = pickle.load(open('results/rnd_search_lgbm_results.pickle', 'rb'))
-    
-    
+    lightgbm_result_minmax = pickle.load(open('results/model_LightGBM_hyper_01_minmax_results.pickle', 'rb'))
+
 

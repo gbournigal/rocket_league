@@ -8,7 +8,14 @@ Created on Tue Oct 25 10:19:04 2022
 import pickle
 import gc
 from data_extract import data_load
-from feature_engineer import distances, demolitions, cols_to_drop, calc_speeds
+from feature_engineer import (distances, 
+                              demolitions,
+                              cols_to_drop,
+                              calc_speeds,
+                              min_dist_to_goal,
+                              max_dist_to_goal,
+                              mean_dist_to_goal)
+from data_augmentation import mirror_board, mirror_x
 from xgboost import XGBClassifier
 from lightgbm import LGBMClassifier
 
@@ -17,14 +24,22 @@ def final_models(df,
                 model_a,
                 model_b):
     
+    target_A = df['team_A_scoring_within_10sec'].astype('int').values
+    target_B = df['team_B_scoring_within_10sec'].astype('int').values
+    
+    del df['team_A_scoring_within_10sec']
+    del df['team_B_scoring_within_10sec']
+    
+    df = df.to_numpy()
+    
     model_b.fit(
-        X=df.drop(columns=['team_A_scoring_within_10sec', 'team_B_scoring_within_10sec']).values,
-        y=df['team_B_scoring_within_10sec'].astype('int').values, 
+        X=df,
+        y=target_B, 
         )
     
     model_a.fit(
-        X=df.drop(columns=['team_A_scoring_within_10sec', 'team_B_scoring_within_10sec']).values,
-        y=df['team_A_scoring_within_10sec'].astype('int').values, 
+        X=df,
+        y=target_A, 
         )
     pickle.dump({'model_a': model_a,
                  'model_b': model_b}, open('results/final_models.pickle', 'wb'))
@@ -34,10 +49,15 @@ if __name__ == '__main__':
     SAMPLE=1
 
     df = data_load(SAMPLE=SAMPLE, df_size='full')
+    df = mirror_board(df, percentage=0.3)
+    df = mirror_x(df, percentage=0.15)
     
     df = distances(df)
     df = demolitions(df)
     df = calc_speeds(df)
+    df = min_dist_to_goal(df)
+    # df = max_dist_to_goal(df)
+    # df = mean_dist_to_goal(df)
     df = df.drop(columns=cols_to_drop)
     gc.collect()
     
@@ -65,7 +85,7 @@ if __name__ == '__main__':
         'feature_fraction': 0.664079, # was 0.75
         'subsample': 0.7,
         'subsample_freq': 8,
-        'n_jobs': -1,
+        'n_jobs': 4,
         'reg_alpha': 0, # was 1
         'reg_lambda': 2, # was 2
         'min_child_samples': 50,

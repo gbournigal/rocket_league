@@ -9,16 +9,22 @@ import pandas as pd
 
 def mirror_ball(data, only_x=False):
     # Mirror the coordinates
-    data["ball_pos_y"] = data["ball_pos_y"] * -1
-    data["ball_vel_y"] = data["ball_vel_y"] * -1
+    if only_x is False:
+        data["ball_pos_y"] = data["ball_pos_y"] * -1
+        data["ball_vel_y"] = data["ball_vel_y"] * -1
     data["ball_pos_x"] = data["ball_pos_x"] * -1
     data["ball_vel_x"] = data["ball_vel_x"] * -1
     return data
     
-def mirror_players(data):
+def mirror_players(data, only_x=False):
     # Mirror the coordinates
-    def mirror(data, p, a):
-        if a in ['x', 'y']:
+    def mirror(data, p, a, only_x=False):
+        if only_x is False:
+            possible_coordinates = ['x', 'y']
+        else:
+            possible_coordinates = ['x']
+        
+        if a in possible_coordinates:
             data[f"p{p}_pos_{a}"] = data[f"p{p}_pos_{a}"] * -1
             data[f"p{p+3}_pos_{a}"] = data[f"p{p+3}_pos_{a}"] * -1
             data[f"p{p}_vel_{a}"] = data[f"p{p}_vel_{a}"] * -1
@@ -32,16 +38,14 @@ def mirror_players(data):
             data[f"p{p}_vel_{a}"] = data[f"p{p+3}_vel_{a}"]
             data[f"p{p+3}_vel_{a}"] = tmp
             
-        elif a == 'z':
+        if a == 'z':
             tmp= data[f"p{p}_pos_z"].copy()
             data[f"p{p}_pos_z"] = data[f"p{p+3}_pos_z"]
             data[f"p{p+3}_pos_z"] = tmp
-
+    
             tmp= data[f"p{p}_vel_z"].copy()
             data[f"p{p}_vel_z"] = data[f"p{p+3}_vel_z"]
             data[f"p{p+3}_vel_z"] = tmp            
-            
-        
         return data
     
     for p in range(3):
@@ -68,13 +72,22 @@ def mirror_others(data):
     return data
 
 
-def mirror_board(data):
-    # mirrordata = data[(data['team_A_scoring_within_10sec'] == '1') | (data['team_B_scoring_within_10sec'] == '1')].copy()
+def mirror_board(data, percentage=1, random_seed=24):
     mirrordata = data.copy()
     mirrordata = mirror_ball(mirrordata)
     mirrordata = mirror_players(mirrordata)
     mirrordata = mirror_others(mirrordata)
-    
+    mirrordata = mirrordata.sample(frac=percentage, random_state=random_seed)
+    data = pd.concat([data, mirrordata])
+    data = data.reset_index(drop=True)
+    return data
+
+
+def mirror_x(data, percentage=1, random_seed=42):
+    mirrordata = data.copy()
+    mirrordata = mirror_ball(mirrordata, only_x=True)
+    mirrordata = mirror_players(mirrordata, only_x=True)
+    mirrordata = mirrordata.sample(frac=percentage, random_state=random_seed)
     data = pd.concat([data, mirrordata])
     data = data.reset_index(drop=True)
     return data
