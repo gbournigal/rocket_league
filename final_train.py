@@ -14,7 +14,8 @@ from feature_engineer import (distances,
                               calc_speeds,
                               min_dist_to_goal,
                               max_dist_to_goal,
-                              mean_dist_to_goal)
+                              mean_dist_to_goal,
+                              add_angle_features)
 from data_augmentation import mirror_board, mirror_x
 from xgboost import XGBClassifier
 from lightgbm import LGBMClassifier
@@ -49,50 +50,51 @@ if __name__ == '__main__':
     SAMPLE=1
 
     df = data_load(SAMPLE=SAMPLE, df_size='full')
-    df = mirror_board(df, percentage=0.3)
-    df = mirror_x(df, percentage=0.15)
+    df = mirror_board(df, percentage=0.75)
+    # df = mirror_x(df, percentage=0.15)
     
     df = distances(df)
     df = demolitions(df)
     df = calc_speeds(df)
     df = min_dist_to_goal(df)
-    # df = max_dist_to_goal(df)
-    # df = mean_dist_to_goal(df)
+    df = add_angle_features(df)
+    df = max_dist_to_goal(df)
+    df = mean_dist_to_goal(df)
     df = df.drop(columns=cols_to_drop)
     gc.collect()
     
-    # params_xgb = {
-    #     'objective': 'binary:logistic',
-    #     'tree_method': 'gpu_hist',
-    #     'n_estimators': 800,
-    #     'colsample_bytree': 0.848755,
-    #     'learning_rate': 0.0205762,
-    #     'max_depth': 9,
-    #     'alpha': 1,
-    #     'lambda': 0,
-    #     'gamma': 0
-    #     }
+    params_xgb = {
+        'objective': 'binary:logistic',
+        'tree_method': 'gpu_hist',
+        'n_estimators': 1800,
+        'colsample_bytree': 0.562821,
+        'learning_rate': 0.0130056,
+        'max_depth': 7,
+        'alpha': 1.5,
+        'lambda': 1.5,
+        'gamma': 0.2
+        }
     
-    # model_a = XGBClassifier(**params_xgb)
-    # model_b = XGBClassifier(**params_xgb)
+    model_a = XGBClassifier(**params_xgb)
+    model_b = XGBClassifier(**params_xgb)
     
-    params_lgbm = {
-        'objective': 'binary',
-        'num_leaves': 140, # was 128
-        'n_estimators': 1500, # was 1000
-        'max_depth': 7, # was 10
-        'learning_rate': 0.03, # was 0.1
-        'feature_fraction': 0.664079, # was 0.75
-        'subsample': 0.7,
-        'subsample_freq': 8,
-        'n_jobs': 4,
-        'reg_alpha': 0, # was 1
-        'reg_lambda': 2, # was 2
-        'min_child_samples': 50,
-    }
+    # params_lgbm = {
+    #     'objective': 'binary',
+    #     'num_leaves': 140, # was 128
+    #     'n_estimators': 1500, # was 1000
+    #     'max_depth': 7, # was 10
+    #     'learning_rate': 0.03, # was 0.1
+    #     'feature_fraction': 0.664079, # was 0.75
+    #     'subsample': 0.7,
+    #     'subsample_freq': 8,
+    #     'n_jobs': 8,
+    #     'reg_alpha': 0, # was 1
+    #     'reg_lambda': 2, # was 2
+    #     'min_child_samples': 50,
+    # }
     
-    model_a = LGBMClassifier(**params_lgbm)
-    model_b = LGBMClassifier(**params_lgbm)
+    # model_a = LGBMClassifier(**params_lgbm)
+    # model_b = LGBMClassifier(**params_lgbm)
     
     final_models(df,
                  model_a,

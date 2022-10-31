@@ -6,7 +6,7 @@ Created on Wed Oct 19 14:57:17 2022
 """
 
 import numpy as np
-
+import math
 
 cols_to_drop = [
     'game_num', 
@@ -102,6 +102,38 @@ def mean_dist_to_goal(df):
     # Team B
     df['mean_dist_to_goal1_B'] = df[[f'p{i}_pos_goal_A_dist' for i in range(3,6)]].mean(axis=1)
     df['mean_dist_to_goal2_B'] = df[[f'p{i}_pos_goal_B_dist' for i in range(3,6)]].mean(axis=1)
+    return df
+
+
+def add_angle_features(df):
+    # Goal Line Angle
+    df['A_goal_angle'] = -1
+    df['B_goal_angle'] = -1    
+    ball_point_tpls = [tuple(x) for x in df[['ball_pos_x', 'ball_pos_y']].to_numpy()]
+
+    ## Team A
+    a_angle, b_angle = [], []
+    for ball_pos in ball_point_tpls:
+        # A
+        vec1 = (-16.37 - ball_pos[0], 100 - ball_pos[1])
+        vec2 = (16.47 - ball_pos[0], 100 - ball_pos[1])
+
+        dot_value = vec1[0]*vec2[0]+vec1[1]*vec2[1]
+        cos_angle = dot_value / (np.sqrt(vec1[0]**2+vec1[1]**2)*np.sqrt(vec2[0]**2+vec2[1]**2))
+        angle = math.acos(cos_angle) * (180.0 / math.pi)
+        a_angle.append(angle)
+
+        # B
+        vec1 = (-16.37 - ball_pos[0], -100 - ball_pos[1])
+        vec2 = (16.47 - ball_pos[0], -100 - ball_pos[1])
+
+        dot_value = vec1[0]*vec2[0]+vec1[1]*vec2[1]
+        cos_angle = dot_value / (np.sqrt(vec1[0]**2+vec1[1]**2)*np.sqrt(vec2[0]**2+vec2[1]**2))
+        angle = math.acos(cos_angle) * (180.0 / math.pi)
+        b_angle.append(angle)
+
+    df['A_goal_angle'] = a_angle
+    df['B_goal_angle'] = b_angle
     return df
 
 # def feature_scaling(df):

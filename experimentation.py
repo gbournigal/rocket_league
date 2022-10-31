@@ -133,6 +133,8 @@ if __name__ == '__main__':
     
     
     
-    lightgbm_result_minmax = pickle.load(open('results/model_LightGBM_hyper_01_minmax_results.pickle', 'rb'))
+    xgb = pickle.load(open('results/model_XGBC_50_hyper_results.pickle', 'rb'))
+    xgb_3 = pickle.load(open('results/model_XGBC_50_hyper_3_results.pickle', 'rb'))
+    xgb_speed = pickle.load(open('results/model_XGBC_50_hyper_speed_results.pickle', 'rb'))
 
 
