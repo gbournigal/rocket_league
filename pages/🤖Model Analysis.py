@@ -5,6 +5,7 @@ Created on Wed Dec 28 15:44:51 2022
 @author: gbournigal
 """
 
+import pickle
 import streamlit as st
 import warnings 
 warnings.filterwarnings('ignore')
@@ -26,9 +27,18 @@ import imageio
 
 from glob import glob
 from matplotlib import animation, rc
+from feature_engineer import distances, demolitions, calc_speeds, min_dist_to_goal, add_angle_features, mean_dist_to_goal, max_dist_to_goal, cols_to_drop
 
 
-train = dt.fread('data/train_0.csv').to_pandas()
+
+@st.cache
+def read_sample_data():
+    return dt.fread('data/train_sample.csv').to_pandas()
+
+
+train = read_sample_data()
+# train = train.sample(10000)
+# train.to_csv('data/train_sample.csv')
 dtypes_dict_train = dict(pd.read_csv('data/train_dtypes.csv').values)
 
 # Reduce memory usage by 70%.
@@ -156,10 +166,24 @@ def main(game_num: int, event_id: int, event_time: str) -> None:
     plt.title(title)
     return fig, ax
     
-    
-fig, ax = main(1, 1002,-33.31303)
 
 
+first_row = train.head(1)
+fig, ax = main(first_row['game_num'][0], first_row['event_id'][0], first_row['event_time'][0])
+
+first_row = distances(first_row)
+first_row = demolitions(first_row)
+first_row = calc_speeds(first_row)
+first_row = min_dist_to_goal(first_row)
+first_row = add_angle_features(first_row)
+first_row = max_dist_to_goal(first_row)
+first_row = mean_dist_to_goal(first_row)
+first_row = first_row.drop(columns=cols_to_drop)
+
+models = pickle.load(open('results/final_models.pickle', 'rb'))
+
+model_a = models['model_a']
+model_b = models['model_b']
 st.title("""🤖Model Analysis""")
 st.pyplot(fig)
 

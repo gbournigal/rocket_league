@@ -42,15 +42,14 @@ def final_models(df,
         X=df,
         y=target_A, 
         )
-    pickle.dump({'model_a': model_a,
-                 'model_b': model_b}, open('results/final_models.pickle', 'wb'))
-    
+    model_b.booster_.save_model("model_b.json")
+    model_a.booster_.save_model("model_a.json")
     
 if __name__ == '__main__':
     SAMPLE=1
 
     df = data_load(SAMPLE=SAMPLE, df_size='full')
-    df = mirror_board(df, percentage=0.75)
+    # df = mirror_board(df, percentage=0.75)
     # df = mirror_x(df, percentage=0.15)
     
     df = distances(df)
@@ -63,38 +62,38 @@ if __name__ == '__main__':
     df = df.drop(columns=cols_to_drop)
     gc.collect()
     
-    params_xgb = {
-        'objective': 'binary:logistic',
-        'tree_method': 'gpu_hist',
-        'n_estimators': 1800,
-        'colsample_bytree': 0.562821,
-        'learning_rate': 0.0130056,
-        'max_depth': 7,
-        'alpha': 1.5,
-        'lambda': 1.5,
-        'gamma': 0.2
-        }
+    # params_xgb = {
+    #     'objective': 'binary:logistic',
+    #     'tree_method': 'gpu_hist',
+    #     'n_estimators': 1800,
+    #     'colsample_bytree': 0.562821,
+    #     'learning_rate': 0.0130056,
+    #     'max_depth': 7,
+    #     'alpha': 1.5,
+    #     'lambda': 1.5,
+    #     'gamma': 0.2
+    #     }
     
-    model_a = XGBClassifier(**params_xgb)
-    model_b = XGBClassifier(**params_xgb)
+    # model_a = XGBClassifier(**params_xgb)
+    # model_b = XGBClassifier(**params_xgb)
     
-    # params_lgbm = {
-    #     'objective': 'binary',
-    #     'num_leaves': 140, # was 128
-    #     'n_estimators': 1500, # was 1000
-    #     'max_depth': 7, # was 10
-    #     'learning_rate': 0.03, # was 0.1
-    #     'feature_fraction': 0.664079, # was 0.75
-    #     'subsample': 0.7,
-    #     'subsample_freq': 8,
-    #     'n_jobs': 8,
-    #     'reg_alpha': 0, # was 1
-    #     'reg_lambda': 2, # was 2
-    #     'min_child_samples': 50,
-    # }
+    params_lgbm = {
+        'objective': 'binary',
+        'num_leaves': 140, # was 128
+        'n_estimators': 1500, # was 1000
+        'max_depth': 7, # was 10
+        'learning_rate': 0.03, # was 0.1
+        'feature_fraction': 0.664079, # was 0.75
+        'subsample': 0.7,
+        'subsample_freq': 8,
+        'n_jobs': 8,
+        'reg_alpha': 0, # was 1
+        'reg_lambda': 2, # was 2
+        'min_child_samples': 50,
+    }
     
-    # model_a = LGBMClassifier(**params_lgbm)
-    # model_b = LGBMClassifier(**params_lgbm)
+    model_a = LGBMClassifier(**params_lgbm)
+    model_b = LGBMClassifier(**params_lgbm)
     
     final_models(df,
                  model_a,
