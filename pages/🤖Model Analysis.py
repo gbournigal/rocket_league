@@ -7,6 +7,7 @@ Created on Wed Dec 28 15:44:51 2022
 
 import pickle
 import streamlit as st
+import plotly.express as px
 import warnings 
 warnings.filterwarnings('ignore')
 
@@ -28,21 +29,14 @@ import imageio
 from glob import glob
 from matplotlib import animation, rc
 from feature_engineer import distances, demolitions, calc_speeds, min_dist_to_goal, add_angle_features, mean_dist_to_goal, max_dist_to_goal, cols_to_drop
+import lightgbm as lgb
 
-
+cols_to_drop_full = cols_to_drop + ['C0', 'team_B_scoring_within_10sec', 'team_A_scoring_within_10sec']
 
 @st.cache
 def read_sample_data():
     return dt.fread('data/train_sample.csv').to_pandas()
 
-
-train = read_sample_data()
-# train = train.sample(10000)
-# train.to_csv('data/train_sample.csv')
-dtypes_dict_train = dict(pd.read_csv('data/train_dtypes.csv').values)
-
-# Reduce memory usage by 70%.
-train = train.astype(dtypes_dict_train)
 
 def draw_rocket_league_field() -> (matplotlib.figure.Figure, matplotlib.axes.SubplotBase):
     """
@@ -165,26 +159,136 @@ def main(game_num: int, event_id: int, event_time: str) -> None:
     ax.legend(facecolor='#676C40', labelcolor='white', loc='upper right', bbox_to_anchor=(1.2, 1.04))
     plt.title(title)
     return fig, ax
+
+
+@st.cache
+def data_with_probs(train):
+    player_positions_y = train.columns[train.columns.str.contains('(^[p0-9_]+)([pos_]+x)')]
+    player_positions_x = train.columns[train.columns.str.contains('(^[p0-9_]+)([pos_]+y)')]
+    ball_positions_y = 'ball_pos_x'
+    ball_positions_x = 'ball_pos_y'
+    viz = train.copy()
+
+    train = distances(train)
+    train = demolitions(train)
+    train = calc_speeds(train)
+    train = min_dist_to_goal(train)
+    train = add_angle_features(train)
+    train = max_dist_to_goal(train)
+    train = mean_dist_to_goal(train)
+    train = train.drop(columns=cols_to_drop_full)
+
+    model_a = lgb.Booster(model_file='model_a.json')
+    model_b = lgb.Booster(model_file='model_b.json')
+
+    viz['prob_a'] = model_a.predict(train)
+    viz['prob_b'] = model_b.predict(train)
     
+    viz = viz[list(player_positions_x) + list(player_positions_y) + list([ball_positions_x]) + list([ball_positions_y]) + ['prob_a', 'prob_b', 'team_B_scoring_within_10sec', 'team_A_scoring_within_10sec', 'game_num', 'event_id', 'event_time']]
+    return viz
 
 
-first_row = train.head(1)
-fig, ax = main(first_row['game_num'][0], first_row['event_id'][0], first_row['event_time'][0])
+def plot_probs(game_snap):
+    plot_probs = game_snap[['prob_a', 'prob_b']].transpose()
+    plot_probs.rename(
+        columns = {plot_probs.columns[0]: 'probabilities'}, inplace=True)
+    plot_probs.reset_index(inplace=True)
+    plot_probs['index'] = np.where(plot_probs['index'] == 'prob_a',
+                                   'Team A',
+                                   'Team_B')
+    fig = px.bar(plot_probs, x="index", y="probabilities", title="Goal Probabilities",
+                 labels={'probabilities':'Probabilities of Scoring',
+                         'index': 'Team'})
+    fig.update_layout(yaxis_tickformat = '.2%')
+    st.plotly_chart(fig, use_container_width=True)
+    
+    
+def result_text(game_snap):
+    message = np.where(game_snap['team_A_scoring_within_10sec'] == 1,
+                       'Actual result: Team A scored within 10 seconds',
+                       np.where(
+                           game_snap['team_B_scoring_within_10sec'] == 1,
+                           'Actual result: Team B scored within 10 seconds',
+                           'Actual result: No goals in the next 10 seconds'
+                           ))
+    prediction = np.where(
+        game_snap['prob_a'] > model_threshold/100,
+        f'The model predicted a goal by team A with probability of {float(game_snap["prob_a"]):.2%}',
+        np.where(
+            game_snap['prob_b'] > model_threshold/100,
+            f'The model predicted a goal by team B with probability of {float(game_snap["prob_b"]):.2%}',
+            f'The model predicted no goals, based on the selected threshold of {model_threshold}%'
+            ))
+    st.text(prediction[0])
+    st.text(message[0])
 
-first_row = distances(first_row)
-first_row = demolitions(first_row)
-first_row = calc_speeds(first_row)
-first_row = min_dist_to_goal(first_row)
-first_row = add_angle_features(first_row)
-first_row = max_dist_to_goal(first_row)
-first_row = mean_dist_to_goal(first_row)
-first_row = first_row.drop(columns=cols_to_drop)
 
-models = pickle.load(open('results/final_models.pickle', 'rb'))
+def define_page(df):
+    if len(df) == 0:
+        st.write("No data found with the selected filters")
+    else:
+        game_snap = df.sample(1)
+        fig, ax = main(int(game_snap['game_num']), int(game_snap['event_id']), float(game_snap['event_time']))
+        st.pyplot(fig)
+        plot_probs(game_snap)
+        result_text(game_snap)
 
-model_a = models['model_a']
-model_b = models['model_b']
+
 st.title("""🤖Model Analysis""")
-st.pyplot(fig)
+train = read_sample_data()
+if st.button('Next Image'):
+    train = read_sample_data()
+    
+dtypes_dict_train = dict(pd.read_csv('data/train_dtypes.csv').values)
 
+# Reduce memory usage by 70%.
+train = train.astype(dtypes_dict_train)
+viz = data_with_probs(train)
+st.sidebar.write('Data Filters')
+resultado = st.sidebar.radio(
+                "Actual Result",
+                ["Any", "No Goals", "Team A Goal", "Team B Goal"],
+            )
+
+if resultado == 'Team A Goal':
+    viz = viz[viz['team_A_scoring_within_10sec']==1]
+elif resultado == 'Team B Goal':
+    viz = viz[viz['team_B_scoring_within_10sec']==1]
+elif resultado == 'No Goals':
+    viz = viz[(viz['team_A_scoring_within_10sec']==0) & (viz['team_B_scoring_within_10sec']==0)]
+
+model_result = st.sidebar.radio(
+                "Model Result (result of prediction based on threshold):",
+                ["Any", "Right", "Wrong"],
+            )
+
+model_threshold = st.sidebar.slider('Model Threshold (% needed to make prediction):', 1, 99, 25) 
+
+if model_result == 'Right':
+    if resultado == 'Team A Goal':
+        viz = viz[viz['prob_a'] > model_threshold/100]
+    elif resultado == 'Team B Goal':
+        viz = viz[viz['prob_b'] > model_threshold/100]
+    elif resultado == 'No Goals':
+        viz = viz[(viz['prob_a'] < model_threshold/100) & (viz['prob_b'] < model_threshold/100)]
+    elif resultado == 'Any':
+        viz = viz[((viz['prob_a'] > model_threshold/100) & (viz['team_A_scoring_within_10sec'] == 1)) |
+                  ((viz['prob_b'] > model_threshold/100) & (viz['team_B_scoring_within_10sec'] == 1)) |
+                  (((viz['prob_a'] < model_threshold/100) & (viz['prob_b'] < model_threshold/100)) & ((viz['team_B_scoring_within_10sec'] == 0) & (viz['team_A_scoring_within_10sec'] == 0)))]
+
+elif model_result == 'Wrong':
+    if resultado == 'Team A Goal':
+        viz = viz[viz['prob_a'] < model_threshold/100]
+    elif resultado == 'Team B Goal':
+        viz = viz[viz['prob_b'] < model_threshold/100]
+    elif resultado == 'No Goals':
+        viz = viz[(viz['prob_a'] > model_threshold/100) | (viz['prob_b'] > model_threshold/100)]
+    elif resultado == 'Any':
+        viz = viz[((viz['prob_a'] < model_threshold/100) & (viz['team_A_scoring_within_10sec'] == 1)) |
+                  ((viz['prob_b'] < model_threshold/100) & (viz['team_B_scoring_within_10sec'] == 1)) |
+                  (((viz['prob_a'] > model_threshold/100) & (viz['prob_b'] > model_threshold/100)) & ((viz['team_B_scoring_within_10sec'] == 0) & (viz['team_A_scoring_within_10sec'] == 0)))]
+
+
+
+define_page(viz)
 
