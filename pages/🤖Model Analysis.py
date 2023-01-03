@@ -191,7 +191,7 @@ def main(game_num: int, event_id: int, event_time: str) -> None:
             f"game_num == {game_num} and event_id == {event_id} and event_time == {event_time}"
         )
         title = (
-            f"game #{game_num} event_id {event_id} event_time {event_time:.2f}"
+            f"game #{game_num} event_id {event_id}"
         )
     else:
         game = train.query(
@@ -360,8 +360,8 @@ def result_text(game_snap):
             f"The model predicted no goals, based on the selected threshold of {model_threshold}%",
         ),
     )
-    st.text(prediction[0])
-    st.text(message[0])
+    st.markdown(prediction[0])
+    st.markdown(message[0])
 
 
 def define_page(df):
@@ -377,6 +377,10 @@ def define_page(df):
         st.pyplot(fig)
         plot_probs(game_snap)
         result_text(game_snap)
+        st.subheader('Aditional Information')
+        st.markdown('Team A: Blue, scores in red goal')
+        st.markdown('Team B: Red, scores in blue goal')
+        st.markdown('Aditional information that is not displayed in the image is available for the model. Like speed and direction of each player and ball.')
 
 
 st.title("""🤖Model Analysis""")
