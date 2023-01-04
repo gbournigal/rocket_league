@@ -377,11 +377,11 @@ def define_page(df):
         st.pyplot(fig)
         plot_probs(game_snap)
         result_text(game_snap)
-        st.subheader('Aditional Information')
-        st.markdown('Team A: Blue, scores in red goal')
-        st.markdown('Team B: Red, scores in blue goal')
-        st.markdown('Aditional information that is not displayed in the image is available for the model. Like speed and direction of each player and ball.')
-
+        with st.expander('Aditional Information'):
+            st.markdown('Team A: Blue, scores in red goal')
+            st.markdown('Team B: Red, scores in blue goal')
+            st.markdown('There is additional information available about the model that is not shown in the image, such as the speed and direction of each player and the ball.')
+            st.markdown('The sidebar allows you to change the filter and visualize specific types of images and model results.')
 
 st.title("""🤖Model Analysis""")
 train = read_sample_data()
